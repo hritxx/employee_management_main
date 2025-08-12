@@ -9,7 +9,6 @@ cat > .gitignore << 'EOF'
 *.sqlite3
 
 # Logs
-logs/
 *.log
 
 # Docker
