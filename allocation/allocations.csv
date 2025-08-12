@@ -1,0 +1,16 @@
+Project Type,Project Code,Project Name,Name,% Allocation,Role,Idle Time (%),Idle Time - Period,Available From,Comments
+Development,PROJ-001,E-Commerce Platform,John Smith,46,Tech Lead,54,6,2025-07-03,Awaiting project assignment
+Infrastructure,PROJ-005,Cloud Migration,John Smith,54,Senior Developer,0,0,2025-07-04,Fully allocated
+Development,PROJ-007,API Integration,Sarah Johnson,16,Developer,84,9,2025-07-04,Awaiting project assignment
+Research,PROJ-004,AI Research Initiative,Sarah Johnson,46,Senior Developer,38,4,2025-07-24,Awaiting project assignment
+Security,PROJ-006,Security Audit,Mike Wilson,32,Designer,68,7,2025-07-10,Awaiting project assignment
+Development,PROJ-001,E-Commerce Platform,Lisa Brown,48,Developer,52,6,2025-07-17,Awaiting project assignment
+Development,PROJ-007,API Integration,David Lee,58,Designer,42,5,2025-07-08,Awaiting project assignment
+Development,PROJ-001,E-Commerce Platform,Sarah Johnson,32,Manager,10,2,2025-07-17,Additional allocation
+Analytics,PROJ-002,Data Analytics Dashboard,Lisa Brown,39,Designer,17,3,2025-07-19,Additional allocation
+Development,PROJ-003,Mobile App Development,Mike Wilson,14,Tech Lead,19,3,2025-07-17,Additional allocation
+Research,PROJ-004,AI Research Initiative,David Lee,26,Tester,4,1,2025-07-21,Additional allocation
+Infrastructure,PROJ-005,Cloud Migration,Lisa Brown,23,Designer,11,2,2025-06-30,Additional allocation
+Security,PROJ-006,Security Audit,John Smith,21,Tester,9,2,2025-07-15,Additional allocation
+Infrastructure,PROJ-005,Cloud Migration,John Smith,18,Tester,15,2,2025-07-14,Additional allocation
+Development,PROJ-007,API Integration,Sarah Johnson,31,Developer,18,3,2025-07-24,Additional allocation

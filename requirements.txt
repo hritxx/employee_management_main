@@ -1,0 +1,38 @@
+# Core framework
+streamlit==1.29.0
+
+# Database
+sqlalchemy==1.4.53
+psycopg2-binary==2.9.9
+
+# Data processing - install these first as they are base dependencies
+numpy==1.24.4
+pandas==1.5.3
+
+# AI Integration
+google-generativeai==0.3.2
+
+# Environment management
+python-dotenv==1.0.0
+
+# File handling
+openpyxl==3.1.2
+
+# Utilities
+requests==2.31.0
+python-dateutil==2.8.2
+
+# Authentication and security
+bcrypt==4.1.2
+
+# Configuration
+pyyaml==6.0.1
+
+# Optional: For enhanced UI components
+plotly==5.17.0
+
+# Reporting
+reportlab==4.0.8
+
+# System utilities
+schedule==1.2.0

@@ -1,0 +1,6 @@
+Employee Code,Employee Name,Department,Designation,Date Of Joining,Notice Date,Exit Policy Name,Exit Date,Expected Resignation Date,Notice Period Days,Reason,Reason Type,Reason of Exit,Resigned Added On
+ACOGINT001,John Smith,Engineering,Data Scientist - Trainee,2023-06-18,2025-06-18,Exit policy for FTEs (90 days Notice Period),2025-09-16,2025-09-16,90,Career Growth,Resignation,NA,2025-06-18
+ACOGINT002,Sarah Johnson,Computational Biology,Jr Scientist Intern,2023-09-13,2025-05-19,Exit policy for FTEs (90 days Notice Period),2025-08-17,2025-08-17,90,Better Opportunity,Termination,NA,2025-05-19
+ACOGINT003,Mike Wilson,Data Science,Web Developer Intern 1,2023-05-17,2025-05-31,Exit policy for FTEs (90 days Notice Period),2025-08-29,2025-08-29,90,Personal Reasons,Retirement,NA,2025-05-31
+ACOGINT004,Lisa Brown,Web Development,Research Analyst,2023-01-05,2025-06-07,Exit policy for FTEs (90 days Notice Period),2025-09-05,2025-09-05,90,Relocation,Contract End,NA,2025-06-07
+ACOGINT005,David Lee,Research,Software Engineer,2023-03-17,2025-05-14,Exit policy for FTEs (90 days Notice Period),2025-08-12,2025-08-12,90,Higher Studies,Mutual Consent,NA,2025-05-14

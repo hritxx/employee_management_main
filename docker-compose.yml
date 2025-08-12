@@ -1,0 +1,131 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: employee_manager_db
+    environment:
+      POSTGRES_DB: employee_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    # No external port exposure - only internal network access
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init_db:/docker-entrypoint-initdb.d
+      - backup_data:/backups
+    networks:
+      - employee_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Employee Manager Application
+  app:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    container_name: employee_manager_app
+    # Only expose the web interface
+    ports:
+      - "8502:8501"
+    environment:
+      # Database Configuration
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: employee_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres123
+      # Application Configuration
+      APP_USERNAME: admin
+      APP_PASSWORD: admin123
+      # Streamlit Configuration
+      STREAMLIT_SERVER_PORT: 8501
+      STREAMLIT_SERVER_ADDRESS: 0.0.0.0
+      # API Configuration
+      GEMINI_API_KEY: AIzaSyBx6zw9ZbXet_dW3pnx2f9I0qWKOnPq4yM
+    volumes:
+      - app_data:/app/data
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+      - ./config:/app/config
+      - backup_data:/app/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - employee_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Weekly backup service
+  backup-scheduler:
+    image: alpine:latest
+    container_name: employee_backup_scheduler
+    volumes:
+      - ./:/app
+      - app_data:/app/data
+      - ./logs:/app/logs
+      - backup_data:/app/backups
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      sh -c "
+        apk add --no-cache docker-cli dcron postgresql15-client python3 &&
+        echo '0 2 * * 0 cd /app && sh infra/scripts/docker-backup.sh' > /etc/crontabs/root &&
+        echo '0 3 1 * * cd /app && python3 infra/scripts/purge_logs.py 30' >> /etc/crontabs/root &&
+        echo 'Starting scheduler services...' &&
+        crond -f -l 2
+      "
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - employee_network
+    restart: unless-stopped
+
+  # Database Administration Tool (Optional)
+  adminer:
+    image: adminer:latest
+    container_name: employee_db_admin
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - employee_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/postgres
+  app_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/app
+  backup_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/backups
+
+networks:
+  employee_network:
+    driver: bridge

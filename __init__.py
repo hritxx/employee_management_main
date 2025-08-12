@@ -1,0 +1,3 @@
+"""
+HR Management System Package
+""" 

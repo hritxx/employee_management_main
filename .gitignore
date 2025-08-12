@@ -1,0 +1,39 @@
+# Create .gitignore to exclude sensitive files
+cat > .gitignore << 'EOF'
+# Environment variables
+.env
+.env.local
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# Docker
+docker-compose.override.yml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Data files
+data/
+uploads/
+EOF
+.venv/
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+__pycache__/
+index.html

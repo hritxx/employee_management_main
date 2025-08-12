@@ -1,0 +1,6 @@
+Employee Code,Employee Name,Business Unit,Team,Department,Designation,DOJ,Shift Name,ShiftDate,Day,In Time,Out Time,Work Duration,Break Duration,Late By,Over Time,Status
+ACOGINT001,John Smith,Technology,Team 1,Engineering,Data Scientist - Trainee,25-08-2024,Default,11-07-2025,Fri,10:43:00,21:24:48,10:41:00,0:30:00,,,Present
+ACOGINT002,Sarah Johnson,Research,Team 2,Computational Biology,Jr Scientist Intern,17-11-2024,Default,11-07-2025,Fri,09:19:00,17:44:39,8:25:00,0:30:00,,,Present
+ACOGINT003,Mike Wilson,Development,Team 3,Data Science,Web Developer Intern 1,09-03-2024,Default,11-07-2025,Fri,10:20:00,19:16:40,8:56:00,0:30:00,15:00,,Present
+ACOGINT004,Lisa Brown,Analytics,Team 4,Web Development,Research Analyst,13-07-2024,Default,11-07-2025,Fri,09:56:00,19:46:30,9:50:00,0:30:00,,0:21:00,Present
+ACOGINT005,David Lee,Innovation,Team 5,Research,Software Engineer,13-09-2024,Default,11-07-2025,Fri,09:26:00,18:32:39,9:06:00,0:30:00,,,Present
