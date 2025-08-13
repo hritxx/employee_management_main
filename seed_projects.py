@@ -8,6 +8,7 @@ Author: AI Data Scientist with 30+ years of experience
 
 import pandas as pd
 import logging
+import re
 from datetime import datetime, date
 from typing import Dict, List, Set, Optional, Tuple
 from pathlib import Path
@@ -63,6 +64,16 @@ class ProjectDataSeeder:
         # Employee code mapping - will be dynamically loaded from database
         self.employee_mapping: Dict[str, str] = {}
         self.employee_name_conflicts: List[Dict] = []
+        
+        # Parsing statistics tracking
+        self.parsing_stats = {
+            'allocation_formats_found': set(),
+            'date_formats_found': set(),
+            'allocation_parsing_failures': [],
+            'date_parsing_failures': [],
+            'successful_allocation_parses': 0,
+            'successful_date_parses': 0
+        }
         
     def load_employee_mapping(self) -> bool:
         """
@@ -148,6 +159,135 @@ class ProjectDataSeeder:
         normalized = ' '.join(normalized.split())
         
         return normalized
+    
+    def _parse_allocation_percentage(self, allocation_value) -> Optional[float]:
+        """
+        Parse allocation percentage from various formats.
+        
+        Handles formats like:
+        - 0.8 (converts to 80)
+        - 80% (extracts 80)
+        - 80 (returns 80)
+        - "80%" (extracts 80)
+        - "0.8" (converts to 80)
+        
+        Args:
+            allocation_value: Raw allocation value from CSV
+            
+        Returns:
+            Optional[float]: Parsed allocation percentage or None if invalid
+        """
+        if pd.isna(allocation_value) or allocation_value == '':
+            return None
+        
+        original_value = allocation_value
+        
+        try:
+            # Convert to string and clean up
+            value_str = str(allocation_value).strip()
+            
+            # Track the original format
+            self.parsing_stats['allocation_formats_found'].add(str(original_value))
+            
+            # Handle percentage format (remove % sign)
+            if '%' in value_str:
+                value_str = value_str.replace('%', '').strip()
+            
+            # Convert to float
+            parsed_value = float(value_str)
+            
+            # If value is between 0 and 1, assume it's a decimal representation (e.g., 0.8 = 80%)
+            if 0 <= parsed_value <= 1:
+                parsed_value = parsed_value * 100
+            
+            # Validate range
+            if 0 <= parsed_value <= 100:
+                self.parsing_stats['successful_allocation_parses'] += 1
+                return parsed_value
+            else:
+                logger.warning(f"Allocation percentage {parsed_value} is outside valid range (0-100)")
+                self.parsing_stats['allocation_parsing_failures'].append(f"{original_value} -> {parsed_value} (out of range)")
+                return None
+                
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Could not parse allocation percentage '{allocation_value}': {e}")
+            self.parsing_stats['allocation_parsing_failures'].append(f"{original_value} -> {str(e)}")
+            return None
+    
+    def _parse_date_flexible(self, date_value) -> Optional[pd.Timestamp]:
+        """
+        Parse date from various formats with flexible handling.
+        
+        Handles formats like:
+        - "3rd December" or "December 3rd"
+        - "December 3" or "3 December" 
+        - "2024-12-03"
+        - "12/03/2024"
+        - "03-Dec-2024"
+        
+        Args:
+            date_value: Raw date value from CSV
+            
+        Returns:
+            Optional[pd.Timestamp]: Parsed date or None if invalid
+        """
+        if pd.isna(date_value) or date_value == '':
+            return None
+        
+        original_value = date_value
+        
+        try:
+            # Convert to string and clean up
+            date_str = str(date_value).strip()
+            
+            # Track the original format
+            self.parsing_stats['date_formats_found'].add(str(original_value))
+            
+            # Handle ordinal numbers (1st, 2nd, 3rd, etc.)
+            ordinal_pattern = r'\b(\d+)(st|nd|rd|th)\b'
+            date_str = re.sub(ordinal_pattern, r'\1', date_str, flags=re.IGNORECASE)
+            
+            # Try various date parsing strategies
+            parsing_strategies = [
+                # Strategy 1: Use pandas default parsing (handles most standard formats)
+                lambda x: pd.to_datetime(x, infer_datetime_format=True),
+                
+                # Strategy 2: Try with dayfirst=True for DD/MM/YYYY formats
+                lambda x: pd.to_datetime(x, dayfirst=True),
+                
+                # Strategy 3: Try specific formats for text dates
+                lambda x: pd.to_datetime(x, format='%B %d'),  # "December 3"
+                lambda x: pd.to_datetime(x, format='%d %B'),  # "3 December"
+                lambda x: pd.to_datetime(x, format='%B %d, %Y'),  # "December 3, 2024"
+                lambda x: pd.to_datetime(x, format='%d %B %Y'),  # "3 December 2024"
+                
+                # Strategy 4: Try with fuzzy parsing (requires dateutil)
+                lambda x: pd.to_datetime(x, errors='coerce')
+            ]
+            
+            for strategy in parsing_strategies:
+                try:
+                    result = strategy(date_str)
+                    if pd.notna(result):
+                        # If year is missing, assume current year
+                        if result.year == 1900:  # pandas default for missing year
+                            current_year = datetime.now().year
+                            result = result.replace(year=current_year)
+                        
+                        self.parsing_stats['successful_date_parses'] += 1
+                        return result
+                except:
+                    continue
+            
+            # If all strategies fail, log the issue
+            logger.warning(f"Could not parse date '{date_value}' using any strategy")
+            self.parsing_stats['date_parsing_failures'].append(str(original_value))
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error parsing date '{date_value}': {e}")
+            self.parsing_stats['date_parsing_failures'].append(f"{original_value} -> {str(e)}")
+            return None
     
     def get_employee_code_for_name(self, csv_name: str) -> Optional[str]:
         """
@@ -243,24 +383,23 @@ class ProjectDataSeeder:
             return False
     
     def _validate_data_quality(self) -> None:
-        """Validate data quality and log any issues."""
+        """Validate data quality and log any issues using robust parsing."""
         for idx, row in self.data_df.iterrows():
-            # Validate allocation percentage
-            try:
-                allocation = float(row['% Allocation'])
-                if not (0 <= allocation <= 100):
-                    self.validation_errors.append({
-                        'row': idx + 2,  # +2 for header and 0-indexing
-                        'field': '% Allocation',
-                        'value': allocation,
-                        'error': 'Allocation percentage must be between 0 and 100'
-                    })
-            except (ValueError, TypeError):
+            # Validate allocation percentage using robust parsing
+            allocation = self._parse_allocation_percentage(row['% Allocation'])
+            if allocation is None:
+                self.validation_errors.append({
+                    'row': idx + 2,  # +2 for header and 0-indexing
+                    'field': '% Allocation',
+                    'value': row['% Allocation'],
+                    'error': 'Could not parse allocation percentage. Expected formats: 80, 80%, 0.8, "80%"'
+                })
+            elif not (0 <= allocation <= 100):
                 self.validation_errors.append({
                     'row': idx + 2,
-                    'field': '% Allocation', 
+                    'field': '% Allocation',
                     'value': row['% Allocation'],
-                    'error': 'Invalid allocation percentage format'
+                    'error': f'Allocation percentage {allocation}% is outside valid range (0-100)'
                 })
             
             # Validate employee mapping
@@ -273,15 +412,14 @@ class ProjectDataSeeder:
                     'error': f'Employee name not found or ambiguous. Available employees: {len(self.employee_mapping)} loaded from database'
                 })
             
-            # Validate date format
-            try:
-                pd.to_datetime(row['Available From'])
-            except:
+            # Validate date format using robust parsing
+            parsed_date = self._parse_date_flexible(row['Available From'])
+            if parsed_date is None:
                 self.validation_errors.append({
                     'row': idx + 2,
                     'field': 'Available From',
                     'value': row['Available From'],
-                    'error': 'Invalid date format'
+                    'error': 'Could not parse date. Expected formats: "December 3", "3rd December", "2024-12-03", etc.'
                 })
         
         if self.validation_errors:
@@ -316,9 +454,19 @@ class ProjectDataSeeder:
                 manager_name = manager_row.iloc[0]['Name']
                 manager_id = self.get_employee_code_for_name(manager_name)
             
-            # Determine project dates from allocations
-            available_dates = pd.to_datetime(project_allocations['Available From'])
-            start_date = available_dates.min().date()
+            # Determine project dates from allocations using robust parsing
+            parsed_dates = []
+            for date_val in project_allocations['Available From']:
+                parsed_date = self._parse_date_flexible(date_val)
+                if parsed_date is not None:
+                    parsed_dates.append(parsed_date)
+            
+            if parsed_dates:
+                start_date = min(parsed_dates).date()
+            else:
+                # Fallback to current date if no valid dates found
+                start_date = date.today()
+                logger.warning(f"No valid dates found for project {project_code}, using current date")
             
             projects.append({
                 'project_id': project_code,
@@ -352,8 +500,19 @@ class ProjectDataSeeder:
                 continue
                 
             try:
-                allocation_percentage = float(row['% Allocation'])
-                effective_from = pd.to_datetime(row['Available From']).date()
+                # Use robust parsing for allocation percentage
+                allocation_percentage = self._parse_allocation_percentage(row['% Allocation'])
+                if allocation_percentage is None:
+                    logger.warning(f"Skipping allocation for {row['Name']} - invalid allocation percentage: {row['% Allocation']}")
+                    continue
+                
+                # Use robust parsing for date
+                effective_from_parsed = self._parse_date_flexible(row['Available From'])
+                if effective_from_parsed is None:
+                    logger.warning(f"Skipping allocation for {row['Name']} - invalid date: {row['Available From']}")
+                    continue
+                
+                effective_from = effective_from_parsed.date()
                 
                 allocation = {
                     'employee_code': employee_code,
@@ -576,6 +735,94 @@ class ProjectDataSeeder:
         except Exception as e:
             logger.error(f"Unexpected error during seeding process: {e}")
             return False
+
+    def _generate_seeding_report(self, projects: List[Dict], allocations: List[Dict]) -> None:
+        """
+        Generate detailed seeding report including parsing statistics.
+        
+        Args:
+            projects: List of seeded projects
+            allocations: List of seeded allocations
+        """
+        logger.info("=" * 60)
+        logger.info("SEEDING REPORT")
+        logger.info("=" * 60)
+        
+        # Basic statistics
+        logger.info(f"📊 SUMMARY STATISTICS:")
+        logger.info(f"  • Total projects seeded: {len(projects)}")
+        logger.info(f"  • Total allocations seeded: {len(allocations)}")
+        
+        # Parsing statistics
+        logger.info(f"\n🔍 DATA PARSING STATISTICS:")
+        logger.info(f"  • Allocation percentage formats found: {len(self.parsing_stats['allocation_formats_found'])}")
+        logger.info(f"  • Date formats found: {len(self.parsing_stats['date_formats_found'])}")
+        logger.info(f"  • Successful allocation parses: {self.parsing_stats['successful_allocation_parses']}")
+        logger.info(f"  • Successful date parses: {self.parsing_stats['successful_date_parses']}")
+        logger.info(f"  • Allocation parsing failures: {len(self.parsing_stats['allocation_parsing_failures'])}")
+        logger.info(f"  • Date parsing failures: {len(self.parsing_stats['date_parsing_failures'])}")
+        
+        # Show detected formats
+        if self.parsing_stats['allocation_formats_found']:
+            logger.info(f"\n📋 ALLOCATION FORMATS DETECTED:")
+            for fmt in sorted(self.parsing_stats['allocation_formats_found']):
+                logger.info(f"  • '{fmt}'")
+        
+        if self.parsing_stats['date_formats_found']:
+            logger.info(f"\n📅 DATE FORMATS DETECTED:")
+            for fmt in sorted(self.parsing_stats['date_formats_found']):
+                logger.info(f"  • '{fmt}'")
+        
+        # Show parsing failures if any
+        if self.parsing_stats['allocation_parsing_failures']:
+            logger.info(f"\n⚠️  ALLOCATION PARSING FAILURES:")
+            for failure in self.parsing_stats['allocation_parsing_failures'][:5]:  # Show first 5
+                logger.info(f"  • {failure}")
+            if len(self.parsing_stats['allocation_parsing_failures']) > 5:
+                logger.info(f"  • ... and {len(self.parsing_stats['allocation_parsing_failures']) - 5} more")
+        
+        if self.parsing_stats['date_parsing_failures']:
+            logger.info(f"\n⚠️  DATE PARSING FAILURES:")
+            for failure in self.parsing_stats['date_parsing_failures'][:5]:  # Show first 5
+                logger.info(f"  • {failure}")
+            if len(self.parsing_stats['date_parsing_failures']) > 5:
+                logger.info(f"  • ... and {len(self.parsing_stats['date_parsing_failures']) - 5} more")
+        
+        # Project summary
+        if projects:
+            project_types = {}
+            for project in projects:
+                # Extract project type from client name (contains project type)
+                client_name = project.get('client_name', 'Unknown')
+                project_type = client_name.replace(' Client', '') if ' Client' in client_name else 'Unknown'
+                project_types[project_type] = project_types.get(project_type, 0) + 1
+            
+            logger.info(f"\n🎯 PROJECTS BY TYPE:")
+            for proj_type, count in sorted(project_types.items()):
+                logger.info(f"  • {proj_type}: {count} projects")
+        
+        # Allocation summary
+        if allocations:
+            allocation_summary = {}
+            total_allocation = 0
+            for allocation in allocations:
+                emp_code = allocation['employee_code']
+                percentage = allocation['allocation_percentage']
+                allocation_summary[emp_code] = allocation_summary.get(emp_code, 0) + percentage
+                total_allocation += percentage
+            
+            logger.info(f"\n👥 ALLOCATION SUMMARY:")
+            logger.info(f"  • Employees with allocations: {len(allocation_summary)}")
+            logger.info(f"  • Average allocation per employee: {total_allocation / len(allocation_summary):.1f}%")
+            
+            # Show over-allocated employees
+            over_allocated = [emp for emp, alloc in allocation_summary.items() if alloc > 100]
+            if over_allocated:
+                logger.info(f"  • Over-allocated employees: {len(over_allocated)}")
+                for emp in over_allocated[:3]:  # Show first 3
+                    logger.info(f"    - {emp}: {allocation_summary[emp]:.1f}%")
+        
+        logger.info("=" * 60)
 
 
 def verify_employee_data() -> bool:
